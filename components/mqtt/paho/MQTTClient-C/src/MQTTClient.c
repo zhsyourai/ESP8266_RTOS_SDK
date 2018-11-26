@@ -359,6 +359,7 @@ int MQTTYield(MQTTClient* c, int timeout_ms)
 #if defined(MQTT_TASK)
     MutexUnlock(&c->mutex);
 #endif
+    
     return rc;
 }
 
