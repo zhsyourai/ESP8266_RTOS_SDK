@@ -351,7 +351,6 @@ int MQTTYield(MQTTClient* c, int timeout_ms)
     MutexLock(&c->mutex);
 #endif
 
-
     if (cycle(c, &timer) < 0)
     {
         rc = FAILURE;
