@@ -51,9 +51,7 @@ int MutexLock(Mutex* mutex)
 
 int MutexUnlock(Mutex* mutex)
 {
-    int x = xSemaphoreGiveRecursive(mutex->sem);
-    taskYIELD();
-    return x;
+    return xSemaphoreGiveRecursive(mutex->sem);
 }
 
 

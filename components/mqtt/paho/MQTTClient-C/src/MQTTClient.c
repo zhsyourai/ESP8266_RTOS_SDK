@@ -351,14 +351,15 @@ int MQTTYield(MQTTClient* c, int timeout_ms)
     MutexLock(&c->mutex);
 #endif
 
-    do
+
+    if (cycle(c, &timer) < 0)
     {
-        if (cycle(c, &timer) < 0)
-        {
-            rc = FAILURE;
-            break;
-        }
-    } while (!TimerIsExpired(&timer));
+        rc = FAILURE;
+    }
+
+#if defined(MQTT_TASK)
+    MutexUnlock(&c->mutex);
+#endif
 
 #if defined(MQTT_TASK)
     MutexUnlock(&c->mutex);
