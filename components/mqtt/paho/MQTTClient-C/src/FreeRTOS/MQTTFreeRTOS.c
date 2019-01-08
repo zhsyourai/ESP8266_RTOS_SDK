@@ -40,17 +40,17 @@ int ThreadStart(Thread *thread, void (*fn)(void *), void *arg)
 
 void MutexInit(Mutex *mutex)
 {
-    mutex->sem = xSemaphoreCreateMutex();
+    mutex->sem = xSemaphoreCreateRecursiveMutex();
 }
 
 int MutexLock(Mutex *mutex)
 {
-    return xSemaphoreTake(mutex->sem, portMAX_DELAY);
+    return xSemaphoreTakeRecursive(mutex->sem, portMAX_DELAY);
 }
 
 int MutexUnlock(Mutex *mutex)
 {
-    return xSemaphoreGive(mutex->sem);
+    return xSemaphoreGiveRecursive(mutex->sem);
 }
 
 
