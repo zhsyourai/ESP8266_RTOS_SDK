@@ -11,8 +11,13 @@ COMPONENT_SRCDIRS := driver source
 
 LIBS ?=
 ifndef CONFIG_NO_BLOBS
+ifndef CONFIG_ESP8266_WIFI_DEBUG_LOG_ENABLE
 LIBS += gcc hal core net80211 \
         phy pp smartconfig ssc wpa espnow wps
+else
+LIBS += gcc hal core_dbg net80211_dbg \
+        phy pp_dbg smartconfig ssc wpa_dbg espnow_dbg wps_dbg
+endif
 endif
 
 #Linker scripts used to link the final application.
@@ -41,12 +46,8 @@ COMPONENT_ADD_LINKER_DEPS := $(ALL_LIB_FILES) $(addprefix ld/,$(LINKER_SCRIPTS))
 # saves us from having to add the target to a Makefile.projbuild
 $(COMPONENT_LIBRARY): esp8266_out.ld esp8266_common_out.ld
 
-APP_OFFSET ?= $(CONFIG_APP_OFFSET)
-APP_SIZE ?= 0x100000
-OUTLD_CFLAGS := -DAPP_OFFSET=$(APP_OFFSET) -DAPP_SIZE=$(APP_SIZE)
-
 esp8266_out.ld: $(COMPONENT_PATH)/ld/esp8266.ld ../include/sdkconfig.h
-	$(CC) $(OUTLD_CFLAGS) -I ../include -C -P -x c -E $< -o $@
+	$(CC) $(CFLAGS) -I ../include -C -P -x c -E $< -o $@
 
 esp8266_common_out.ld: $(COMPONENT_PATH)/ld/esp8266.common.ld ../include/sdkconfig.h
 	$(CC) -I ../include -C -P -x c -E $< -o $@

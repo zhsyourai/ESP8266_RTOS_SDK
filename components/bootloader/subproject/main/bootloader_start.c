@@ -18,8 +18,10 @@
 #include "bootloader_config.h"
 #include "bootloader_init.h"
 #include "bootloader_utility.h"
+#include "bootloader_common.h"
 #include "esp_image_format.h"
 #include "esp_log.h"
+#include "esp_spi_flash.h"
 
 static const char* TAG = "boot";
 
@@ -97,6 +99,11 @@ static int selected_boot_partition(const bootloader_state_t *bs)
 #ifdef CONFIG_BOOTLOADER_APP_TEST
         if (bootloader_common_check_long_hold_gpio(CONFIG_BOOTLOADER_NUM_PIN_APP_TEST, CONFIG_BOOTLOADER_HOLD_TIME_GPIO) == 1) {
             ESP_LOGI(TAG, "Detect a boot condition of the test firmware");
+#ifdef CONFIG_BOOTLOADER_APP_TEST_IN_OTA_1
+            /* In this case, test bin will locate in ota_1 by default.
+               This is the solution for small Flash. */
+            return 1;
+#else
             if (bs->test.offset != 0) {
                 boot_index = TEST_APP_INDEX;
                 return boot_index;
@@ -104,6 +111,19 @@ static int selected_boot_partition(const bootloader_state_t *bs)
                 ESP_LOGE(TAG, "Test firmware is not found in partition table");
                 return INVALID_INDEX;
             }
+#endif
+        }
+#endif
+#ifdef CONFIG_ESP8266_BOOT_COPY_APP
+        if (boot_index == 1) {
+            ESP_LOGI(TAG, "Copy application from OAT1 to OTA0, please wait ...");
+            int ret = esp_patition_copy_ota1_to_ota0(bs);
+            if (ret) {
+                ESP_LOGE(TAG, "Fail to initialize OTA0");
+                return INVALID_INDEX;
+            }
+
+            boot_index = 0;
         }
 #endif
         // Customer implementation.

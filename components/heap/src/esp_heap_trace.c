@@ -19,11 +19,11 @@
 #include "esp_heap_trace.h"
 #include "priv/esp_heap_caps_priv.h"
 
-#include "esp_log.h"
-
 //#define CONFIG_TRACE_ALL
 //#define CONFIG_TRACE_MEM_LINK 1
 //#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+
+#include "esp_log.h"
 
 #ifdef CONFIG_TRACE_ALL
 #define HEAP_INFO_STATE " is %s"
@@ -42,8 +42,9 @@
 #endif
 
 static const char *TAG = "heap_trace";
-static int s_heap_trace_mode = HEAP_TRACE_NONE;
+
 extern heap_region_t g_heap_region[HEAP_REGIONS_MAX];
+extern int __g_heap_trace_mode;
 
 /**
  * @brief Empty function just for passing compiling some place.
@@ -58,7 +59,7 @@ esp_err_t heap_trace_init_standalone(heap_trace_record_t *record_buffer, size_t 
  */
 int heap_trace_is_on(void)
 {
-    return s_heap_trace_mode == HEAP_TRACE_LEAKS;
+    return __g_heap_trace_mode == HEAP_TRACE_LEAKS;
 }
 
 /**
@@ -66,7 +67,7 @@ int heap_trace_is_on(void)
  */
 esp_err_t heap_trace_start(heap_trace_mode_t mode)
 {
-    s_heap_trace_mode = mode;
+    __g_heap_trace_mode = mode;
 
     return ESP_OK;
 }
@@ -76,7 +77,7 @@ esp_err_t heap_trace_start(heap_trace_mode_t mode)
  */
 esp_err_t heap_trace_stop(void)
 {
-    s_heap_trace_mode = HEAP_TRACE_NONE;
+    __g_heap_trace_mode = HEAP_TRACE_NONE;
 
     return ESP_OK;
 }
@@ -86,7 +87,7 @@ esp_err_t heap_trace_stop(void)
  */
 esp_err_t heap_trace_resume(void)
 {
-    s_heap_trace_mode = HEAP_TRACE_LEAKS;
+    __g_heap_trace_mode = HEAP_TRACE_LEAKS;
 
     return ESP_OK;
 }
@@ -108,10 +109,10 @@ void heap_trace_dump(void)
 
         _heap_caps_lock(num);
 
-        ESP_LOGI(TAG, "\r\n\r\n");
-        ESP_LOGD(TAG, "start %p end %p", mem_start, mem_end);
-        ESP_LOGD(TAG, "free blk %p", g_heap_region[num].free_blk);
-        ESP_LOGD(TAG, "size %d mini size %d", g_heap_region[num].free_bytes, g_heap_region[num].min_free_bytes);
+        ESP_EARLY_LOGI(TAG, "\r\n\r\n");
+        ESP_EARLY_LOGD(TAG, "start %p end %p", mem_start, mem_end);
+        ESP_EARLY_LOGD(TAG, "free blk %p", g_heap_region[num].free_blk);
+        ESP_EARLY_LOGD(TAG, "size %d mini size %d", g_heap_region[num].free_bytes, g_heap_region[num].min_free_bytes);
 
         p = mem_start;
         while (p != mem_end) {
@@ -120,7 +121,7 @@ void heap_trace_dump(void)
                 size_t line = mem2_blk_line(mem2_blk);
 
                 if (!line) {
-                    ESP_LOGI(TAG, HEAP_INFO " caller func %p", HEAP_INFO_PARAM(p), mem2_blk->file);
+                    ESP_EARLY_LOGI(TAG, HEAP_INFO " caller func %p", HEAP_INFO_PARAM(p), mem2_blk->file);
                 } else {
                     const char *file = rindex(mem2_blk->file, '/');
                     if (file)
@@ -128,7 +129,7 @@ void heap_trace_dump(void)
                     else
                         file = mem2_blk->file;
 
-                    ESP_LOGI(TAG, HEAP_INFO " caller file %s line %d", HEAP_INFO_PARAM(p), file, line);
+                    ESP_EARLY_LOGI(TAG, HEAP_INFO " caller file %s line %d", HEAP_INFO_PARAM(p), file, line);
                 }
             }
 #ifdef CONFIG_TRACE_ALL

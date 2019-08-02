@@ -47,10 +47,18 @@
 #include "sdkconfig.h"
 #include <stddef.h>
 #include <stdbool.h>
+#include <time.h>
 #include "esp_libc.h"
 #include "esp_system.h"
+#include "driver/soc.h"
 
 #define ESP_LWIP 1
+
+#ifdef CONFIG_ESP_DNS
+#define ESP_DNS  1
+#else
+#define ESP_DNS  0
+#endif
 
 #ifdef CONFIG_LWIP_IPV6_MLD_SOCK
 #define ESP_LWIP_IPV6_MLD 1
@@ -66,9 +74,22 @@
 #define SOCKETS_MT
 #endif
 
+#if CONFIG_ENABLE_NONBLOCK_SPEEDUP
+#define ESP_NONBLOCK    1
+#else
+#define ESP_NONBLOCK    0
+#endif
+
 //#define SOCKETS_TCP_TRACE
 
 #define TCP_HIGH_SPEED_RETRANSMISSION CONFIG_TCP_HIGH_SPEED_RETRANSMISSION
+
+/**
+ * @brief System
+ */
+#define SYS_ARCH_DECL_PROTECT(_lev)    esp_irqflag_t _lev
+#define SYS_ARCH_PROTECT(_lev)         _lev = soc_save_local_irq()
+#define SYS_ARCH_UNPROTECT(_lev)       soc_restore_local_irq(_lev)
 
  /*
    ------------------------------------
@@ -213,6 +234,8 @@
 #define ESP_LWIP_MEM_DBG                    1
 #endif
 
+size_t memp_malloc_get_size(size_t type);
+
 /*
  * @brief allocate an only DRAM memory block for LWIP pbuf
  * 
@@ -220,7 +243,7 @@
  * 
  * @return memory block pointer
  */
-void *mem_malloc_ll(size_t s);
+#define mem_malloc_ll(s)         heap_caps_malloc(s, MALLOC_CAP_8BIT)
 
 /*
  * @brief allocate an only DRAM memory pool for LWIP pbuf
@@ -229,7 +252,7 @@ void *mem_malloc_ll(size_t s);
  * 
  * @return memory pool pointer
  */
-void *memp_malloc_ll(size_t type);
+#define memp_malloc_ll(type)     heap_caps_malloc(memp_pools[type]->size, MALLOC_CAP_8BIT)
 #endif
 
 /**
@@ -814,6 +837,7 @@ void *memp_malloc_ll(size_t type);
  * DNS_SERVER_ADDRESS(ipaddr), where 'ipaddr' is an 'ip_addr_t*'
  */
 #define DNS_MAX_SERVERS                 CONFIG_DNS_MAX_SERVERS
+#define DNS_FALLBACK_SERVER_INDEX       (DNS_MAX_SERVERS - 1)
 
 /** DNS do a name checking between the query and the response. */
 #define DNS_DOES_NAME_CHECK             1
@@ -1289,21 +1313,21 @@ void *memp_malloc_ll(size_t type);
  * The stack size value itself is platform-dependent, but is passed to
  * sys_thread_new() when the thread is created.
  */
-#define DEFAULT_THREAD_STACKSIZE        0
+#define DEFAULT_THREAD_STACKSIZE        TCPIP_THREAD_STACKSIZE
 
 /**
  * DEFAULT_THREAD_PRIO: The priority assigned to any other lwIP thread.
  * The priority value itself is platform-dependent, but is passed to
  * sys_thread_new() when the thread is created.
  */
-#define DEFAULT_THREAD_PRIO             1
+#define DEFAULT_THREAD_PRIO             TCPIP_THREAD_PRIO
 
 /**
  * DEFAULT_RAW_RECVMBOX_SIZE: The mailbox size for the incoming packets on a
  * NETCONN_RAW. The queue size value itself is platform-dependent, but is passed
  * to sys_mbox_new() when the recvmbox is created.
  */
-#define DEFAULT_RAW_RECVMBOX_SIZE       0
+#define DEFAULT_RAW_RECVMBOX_SIZE       6
 
 /**
  * DEFAULT_UDP_RECVMBOX_SIZE: The mailbox size for the incoming packets on a
@@ -1404,7 +1428,11 @@ void *memp_malloc_ll(size_t type);
  * Disable this option if you use a POSIX operating system that uses the same
  * names (read, write & close). (only used if you use sockets.c)
  */
+#ifdef CONFIG_USING_ESP_VFS
+#define LWIP_POSIX_SOCKETS_IO_NAMES     0
+#else
 #define LWIP_POSIX_SOCKETS_IO_NAMES     1
+#endif
 
 /**
  * LWIP_SOCKET_OFFSET==n: Increases the file descriptor number created by LwIP with n.
@@ -1413,7 +1441,11 @@ void *memp_malloc_ll(size_t type);
  * re implement read/write/close/ioctl/fnctl to send the requested action to the right
  * library (sharing select will need more work though).
  */
+#ifdef CONFIG_USING_ESP_VFS
+#define LWIP_SOCKET_OFFSET              (FD_SETSIZE - CONFIG_LWIP_MAX_SOCKETS)
+#else
 #define LWIP_SOCKET_OFFSET              0
+#endif
 
 /**
  * LWIP_TCP_KEEPALIVE==1: Enable TCP_KEEPIDLE, TCP_KEEPINTVL and TCP_KEEPCNT
@@ -1449,6 +1481,8 @@ void *memp_malloc_ll(size_t type);
  * LWIP_SO_LINGER==1: Enable SO_LINGER processing.
  */
 #define LWIP_SO_LINGER                  1
+
+#define SET_SOLINGER_DEFAULT            CONFIG_SET_SOLINGER_DEFAULT
 
 /**
  * If LWIP_SO_RCVBUF is used, this is the default value for recv_bufsize.

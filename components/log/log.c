@@ -27,11 +27,12 @@
 #include "xtensa/hal.h"
 
 #include "esp_log.h"
+#include "esp_system.h"
 
 #ifdef CONFIG_LOG_COLORS
-#define LOG_COLOR           "\033[0;%dm"
-#define LOG_BOLD            "\033[1;%dm"
-#define LOG_RESET_COLOR     "\033[0m"
+#define LOG_COLOR_HEAD      "\033[0;%dm"
+#define LOG_BOLD_HEAD       "\033[1;%dm"
+#define LOG_COLOR_END       "\033[0m"
 
 static const uint32_t s_log_color[ESP_LOG_MAX] = {
     0,  //  ESP_LOG_NONE
@@ -52,9 +53,9 @@ static const char s_log_prefix[ESP_LOG_MAX] = {
     'V', //  ESP_LOG_VERBOSE
 };
 
-static uint32_t IRAM_ATTR esp_log_early_timestamp()
+uint32_t IRAM_ATTR esp_log_early_timestamp()
 {
-    return xthal_get_ccount() / (80 * 1000);
+    return xthal_get_ccount() / ((CRYSTAL_USED * 2) * 1000);
 }
 
 #ifndef BOOTLOADER_BUILD
@@ -189,9 +190,15 @@ static int esp_log_write_str(const char *s)
     return ret;
 }
 
-static uint32_t esp_log_timestamp()
+uint32_t esp_log_timestamp()
 {
-    return clock() * (1000 / CLOCKS_PER_SEC) + esp_log_early_timestamp() % (1000 / CLOCKS_PER_SEC);
+    static uint32_t base = 0;
+
+    if (base == 0) {
+        base = esp_log_early_timestamp();
+    }
+
+    return base + clock() * (1000 / CLOCKS_PER_SEC);
 }
 #endif
 
@@ -207,7 +214,7 @@ void IRAM_ATTR esp_early_log_write(esp_log_level_t level, const char *tag, const
     uint32_t color = level >= ESP_LOG_MAX ? 0 : s_log_color[level];
 
     if (color)
-        ets_printf(LOG_COLOR, color);
+        ets_printf(LOG_COLOR_HEAD, color);
 #endif
 
     if (ets_printf("%c (%d) %s: ", prefix, esp_log_early_timestamp(), tag) < 0)
@@ -220,7 +227,7 @@ void IRAM_ATTR esp_early_log_write(esp_log_level_t level, const char *tag, const
 out:
 #ifdef CONFIG_LOG_COLORS
     if (color)
-        ets_printf(LOG_RESET_COLOR);
+        ets_printf(LOG_COLOR_END);
 #endif
     ets_printf("\n");
 }
@@ -248,7 +255,7 @@ void esp_log_write(esp_log_level_t level, const char *tag,  const char *fmt, ...
     uint32_t color = level >= ESP_LOG_MAX ? 0 : s_log_color[level];
 
     if (color) {
-        sprintf(buf, LOG_COLOR, color);
+        sprintf(buf, LOG_COLOR_HEAD, color);
         ret = esp_log_write_str(buf);
         if (ret == EOF)
             goto exit;
@@ -276,7 +283,7 @@ void esp_log_write(esp_log_level_t level, const char *tag,  const char *fmt, ...
 out:
 #ifdef CONFIG_LOG_COLORS
     if (color) {
-        ret = esp_log_write_str(LOG_RESET_COLOR);
+        ret = esp_log_write_str(LOG_COLOR_END);
         if (ret == EOF)
             goto exit;
     }

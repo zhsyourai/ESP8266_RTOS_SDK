@@ -63,6 +63,23 @@ config LWIP_SOCKET_MULTITHREAD
         Enable the option can enable LWIP socket multithread and all
         function will be thread safe.
 
+config ENABLE_NONBLOCK_SPEEDUP
+    bool "Speed up send speed of nonblock TCP"
+    default n
+    help
+        Enable this option, send speed of nonblock TCP will increase obviously.
+
+config SET_SOLINGER_DEFAULT
+    bool "set socket SO_LINGER default"
+    default y
+    depends on LWIP_SOCKET_MULTITHREAD
+    help
+        The function is only used by socket multi-thread.
+
+        Enable this option can set the target socket to enable the "SO_LINGER" and config timeout to be "0" when it is created.
+        It means that if close the socket, all send queue will be dropped, so heap memory can be collected immediately,
+        but some packets which are waiting to be sent will lost.
+
 config ESP_UDP_SYNC_SEND
     bool "LWIP socket UDP sync send"
     default y
@@ -258,10 +275,18 @@ config LWIP_IGMP
     bool "Enable IGMP module"
     default y
 
+config ESP_DNS
+    bool "Enable espressif advansed DNS"
+    default y
+    help
+        Enable this option, espressif advansed DNS functions will be enable. User can set the
+        reserved DNS server(its index is DNS_FALLBACK_SERVER_INDEX) which will not be changed by DHCP.
+
 config DNS_MAX_SERVERS
     int "The maximum of DNS servers"
-    range 1 5
-    default 2
+    range 2 5
+    default 3 if ESP_DNS
+    default 2 if !ESP_DNS
 
 menuconfig LWIP_NETIF_LOOPBACK
     bool "Enable per-interface loopback"

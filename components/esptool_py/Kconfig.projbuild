@@ -53,6 +53,8 @@ choice FLASHMODE
 		Mode the flash chip is flashed in, as well as the default mode for the
 		binary to run in.
 
+		The esptool.py flashes firmware at DIO mode when user select "QIO", "QOUT" or "DIO" mode.
+
 config FLASHMODE_QIO
 	bool "QIO"
 config FLASHMODE_QOUT
@@ -63,21 +65,13 @@ config FLASHMODE_DOUT
 	bool "DOUT"
 endchoice
 
-config FLASHMODE_SWITCH_TO_QIO
-	bool "Try to switch to QIO mode at startup"
-	default y
-	depends on FLASHMODE_DIO
-	help
-        If users use SPI flash DIO mode to download firmware, bootloader or application 
-        can switch to QIO mode by enable this option.
-
 # Note: we use esptool.py to flash bootloader in
 # dio mode for QIO/QOUT, bootloader then upgrades
 # itself to quad mode during initialisation
 config ESPTOOLPY_FLASHMODE
 	string
-	default "qio" if FLASHMODE_QIO
-	default "qout" if FLASHMODE_QOUT
+	default "dio" if FLASHMODE_QIO
+	default "dio" if FLASHMODE_QOUT
 	default "dio" if FLASHMODE_DIO
 	default "dout" if FLASHMODE_DOUT
 
@@ -122,7 +116,9 @@ choice ESPTOOLPY_FLASHSIZE
 	prompt "Flash size"
 	default ESPTOOLPY_FLASHSIZE_2MB
 	help
-		SPI flash size, in megabytes
+		SPI flash size, in megabytes. Users must not configure a larger value than their real flash size.
+		Otherwise an unexpected result may cause if users read/write a wrong address of flash.
+
 config ESPTOOLPY_FLASHSIZE_1MB
 	bool "1 MB"
 config ESPTOOLPY_FLASHSIZE_2MB
@@ -174,23 +170,26 @@ config ESPTOOLPY_BEFORE
 
 choice ESPTOOLPY_AFTER
     prompt "After flashing"
-    default ESPTOOLPY_AFTER_RESET
+    default ESPTOOLPY_AFTER_HARD_RESET
     help
-        Configure whether esptool.py should reset the ESP32 after flashing.
+        Configure whether esptool.py should reset the ESP8266 after flashing.
 
         Automatic resetting depends on the RTS & DTR signals being
         wired from the serial port to the ESP32. Most USB development
         boards do this internally.
 
-config ESPTOOLPY_AFTER_RESET
-    bool "Reset after flashing"
+config ESPTOOLPY_AFTER_HARD_RESET
+    bool "Hard reset after flashing"
+config ESPTOOLPY_AFTER_SOFT_RESET
+    bool "Soft reset after flashing"
 config ESPTOOLPY_AFTER_NORESET
     bool "Stay in bootloader"
 endchoice
 
 config ESPTOOLPY_AFTER
     string
-    default "hard_reset" if ESPTOOLPY_AFTER_RESET
+    default "hard_reset" if ESPTOOLPY_AFTER_HARD_RESET
+    default "soft_reset" if ESPTOOLPY_AFTER_SOFT_RESET
     default "no_reset" if ESPTOOLPY_AFTER_NORESET
 
 choice MONITOR_BAUD
@@ -241,5 +240,13 @@ config ESPTOOLPY_ENABLE_TIME
 	default n
 	help
 		Enable this option, time string will be added at the head of serial input data line.
+
+config ESPTOOLPY_ENABLE_SAVELOG
+	bool "Enable console log save"
+	default n
+	help
+		Enable this option, all console output will auto-save to current 'log' directory which same level as the 'build` directory; 
+		if 'log' directory is not exist, will create it. 
+		All console output will be saved as a log filename, named PROJECT_NAME + timestamp.log, which PROJECT_NAME defined in your demo Makefile.
 
 endmenu

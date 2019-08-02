@@ -19,14 +19,42 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
+#include "sdkconfig.h"
+
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#if CONFIG_CRYSTAL_USED_26MHZ
+#define CRYSTAL_USED 26
+#endif
+
+#if CONFIG_CRYSTAL_USED_40MHZ
+#define CRYSTAL_USED 40
 #endif
 
 typedef enum {
     ESP_MAC_WIFI_STA,
     ESP_MAC_WIFI_SOFTAP,
 } esp_mac_type_t;
+
+
+/**
+ * @brief Reset reasons
+ */
+typedef enum {
+    ESP_RST_UNKNOWN = 0,    //!< Reset reason can not be determined
+    ESP_RST_POWERON,        //!< Reset due to power-on event
+    ESP_RST_EXT,            //!< Reset by external pin (not applicable for ESP8266)
+    ESP_RST_SW,             //!< Software reset via esp_restart
+    ESP_RST_PANIC,          //!< Software reset due to exception/panic
+    ESP_RST_INT_WDT,        //!< Reset (software or hardware) due to interrupt watchdog
+    ESP_RST_TASK_WDT,       //!< Reset due to task watchdog
+    ESP_RST_WDT,            //!< Reset due to other watchdogs
+    ESP_RST_DEEPSLEEP,      //!< Reset after exiting deep sleep mode
+    ESP_RST_BROWNOUT,       //!< Brownout reset (software or hardware)
+    ESP_RST_SDIO,           //!< Reset over SDIO
+} esp_reset_reason_t;
 
 /**
   * @brief  Set base MAC address with the MAC address which is stored in EFUSE or
@@ -124,6 +152,12 @@ void system_restore(void)  __attribute__ ((noreturn));
 void esp_restart(void) __attribute__ ((noreturn));
 
 /**
+ * @brief  Get reason of last reset
+ * @return See description of esp_reset_reason_t for explanation of each value.
+ */
+esp_reset_reason_t esp_reset_reason(void);
+
+/**
   * @brief  Get the size of available heap.
   *
   * Note that the returned value may be larger than the maximum contiguous block
@@ -174,13 +208,17 @@ typedef enum {
  * @brief Chip models
  */
 typedef enum {
-    CHIP_ESP8266 = 1, //!< ESP8266
+    CHIP_ESP8266 = 0, //!< ESP8266
+    CHIP_ESP32 = 1, //!< ESP32
 } esp_chip_model_t;
 
 /**
  * Chip feature flags, used in esp_chip_info_t
  */
-#define CHIP_FEATURE_WIFI_BGN       (1 << 0)
+#define CHIP_FEATURE_EMB_FLASH      BIT(0)      //!< Chip has embedded flash memory
+#define CHIP_FEATURE_WIFI_BGN       BIT(1)      //!< Chip has 2.4GHz WiFi
+#define CHIP_FEATURE_BLE            BIT(4)      //!< Chip has Bluetooth LE
+#define CHIP_FEATURE_BT             BIT(5)      //!< Chip has Bluetooth Classic
 
 /**
  * @brief The structure represents information about the chip
@@ -203,8 +241,6 @@ void esp_chip_info(esp_chip_info_t* out_info);
   *
   *         Flash map depends on the selection when compiling, more details in document
   *         "2A-ESP8266__IOT_SDK_User_Manual"
-  *
-  * @param  null
   *
   * @return enum flash_size_map
   */

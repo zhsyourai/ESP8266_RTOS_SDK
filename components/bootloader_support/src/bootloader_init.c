@@ -14,7 +14,7 @@
 
 #include "sdkconfig.h"
 
-#ifdef CONFIG_TARGET_PLATFORM_ESP32
+#ifdef CONFIG_IDF_TARGET_ESP32
 
 #include <string.h>
 #include <stdint.h>
@@ -536,7 +536,7 @@ void __assert_func(const char *file, int line, const char *func, const char *exp
 
 #endif
 
-#ifdef CONFIG_TARGET_PLATFORM_ESP8266
+#ifdef CONFIG_IDF_TARGET_ESP8266
 
 #include <string.h>
 
@@ -568,7 +568,7 @@ static void update_flash_config(const esp_image_header_t* pfhdr);
 
 static void uart_console_configure(void)
 {
-#if CONFIG_CONSOLE_UART_SWAP_IO
+#if CONFIG_UART0_SWAP_IO
     while (READ_PERI_REG(UART_STATUS(0)) & (UART_TXFIFO_CNT << UART_TXFIFO_CNT_S));
 
     PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTCK_U, FUNC_UART0_CTS);
@@ -595,7 +595,9 @@ static void uart_console_configure(void)
     CLEAR_PERI_REG_MASK(UART_CONF0(CONFIG_CONSOLE_UART_NUM), UART_RXFIFO_RST | UART_TXFIFO_RST);
 #endif
 
+#ifdef CONFIG_CONSOLE_UART_BAUDRATE
     uart_div_modify(CONFIG_CONSOLE_UART_NUM, BOOTLOADER_CONSOLE_CLK_FREQ / CONFIG_CONSOLE_UART_BAUDRATE);
+#endif
 }
 
 esp_err_t bootloader_init()
@@ -619,11 +621,18 @@ static esp_err_t bootloader_main()
         return ESP_FAIL;
     }
 
-    update_flash_config(&fhdr);
-
     ESP_LOGI(TAG, "ESP-IDF %s 2nd stage bootloader", IDF_VER);
 
     ESP_LOGI(TAG, "compile time " __TIME__ );
+
+#if defined(CONFIG_FLASHMODE_QIO) || defined(CONFIG_FLASHMODE_QOUT)
+    fhdr.spi_mode = CONFIG_SPI_FLASH_MODE;
+#endif
+
+    extern void phy_reg_default(void);
+    phy_reg_default();
+
+    update_flash_config(&fhdr);
 
     print_flash_info(&fhdr);
 
@@ -639,6 +648,8 @@ static void update_flash_config(const esp_image_header_t* pfhdr)
 
     ESP_LOGD(TAG, "bootloader initialize SPI flash clock and I/O");
 #endif /* CONFIG_BOOTLOADER_INIT_SPI_FLASH */
+
+    Cache_Read_Disable();
 }
 
 static void print_flash_info(const esp_image_header_t* phdr)

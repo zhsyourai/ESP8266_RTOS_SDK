@@ -14,7 +14,7 @@
 
 #include "sdkconfig.h"
 
-#ifdef CONFIG_TARGET_PLATFORM_ESP32
+#ifdef CONFIG_IDF_TARGET_ESP32
 
 #include <string.h>
 #include <stdint.h>
@@ -478,7 +478,7 @@ static void set_cache_and_start_app(
 
 #endif
 
-#ifdef CONFIG_TARGET_PLATFORM_ESP8266
+#ifdef CONFIG_IDF_TARGET_ESP8266
 
 #include <stdbool.h>
 #include <sys/param.h>
@@ -493,6 +493,7 @@ static void set_cache_and_start_app(
 #include "esp_log.h"
 
 #include "esp_flash_partitions.h"
+#include "internal/esp_system_internal.h"
 
 #ifdef CONFIG_SOC_FULL_ICACHE
 #define SOC_CACHE_SIZE 1 // 32KB
@@ -511,6 +512,14 @@ bool bootloader_utility_load_partition_table(bootloader_state_t* bs)
     const char *partition_usage;
     esp_err_t err;
     int num_partitions;
+
+    rtc_sys_info.old_sysconf_addr = 0;
+#ifdef CONFIG_ESP8266_OTA_FROM_OLD
+    if (esp_patition_table_init_location()) {
+        ESP_LOGE(TAG, "Failed to update partition table location");
+        return false;
+    }
+#endif
 
 #ifdef CONFIG_SECURE_BOOT_ENABLED
     if(esp_secure_boot_enabled()) {
@@ -583,6 +592,9 @@ bool bootloader_utility_load_partition_table(bootloader_state_t* bs)
                 partition_usage = "OTA data";
                 break;
             case PART_SUBTYPE_DATA_RF:
+#ifdef CONFIG_LOAD_OLD_RF_PARAMETER
+                bs->rf = partition->pos;
+#endif
                 partition_usage = "RF data";
                 break;
             case PART_SUBTYPE_DATA_WIFI:
@@ -604,6 +616,13 @@ bool bootloader_utility_load_partition_table(bootloader_state_t* bs)
     }
 
     bootloader_munmap(partitions);
+
+#ifdef CONFIG_ESP8266_OTA_FROM_OLD
+    if (esp_patition_table_init_data(bs)) {
+        ESP_LOGE(TAG,"Failed to update partition data");
+        return false;
+    }
+#endif
 
     ESP_LOGI(TAG,"End of partition table");
     return true;

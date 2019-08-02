@@ -88,7 +88,7 @@ typedef unsigned int INT32U;
 /*-----------------------------------------------------------*/
 
 /* Scheduler utilities. */
-extern void PendSV(char req);
+extern void PendSV(int req);
 //#define portYIELD()	vPortYield()
 #define portYIELD()	PendSV(1)
 
@@ -158,8 +158,6 @@ void        _xt_user_exit           (void);
 void        _xt_tick_timer_init   (void);
 void        _xt_isr_unmask       (uint32_t unmask);
 void        _xt_isr_mask       (uint32_t mask);
-uint32_t    _xt_read_ints (void);
-void        _xt_clear_ints(uint32_t mask);
 
 /* interrupt related */
 typedef void (* _xt_isr)(void *arg);
@@ -201,9 +199,14 @@ uint32_t xPortGetTickRateHz(void);
 
 void _xt_enter_first_task(void);
 
+void esp_increase_tick_cnt(const TickType_t ticks);
+
 /* API compatible with esp-idf  */
 #define xTaskCreatePinnedToCore(pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pvCreatedTask, tskNO_AFFINITY) \
         xTaskCreate(pvTaskCode, pcName, usStackDepth, pvParameters, uxPriority, pvCreatedTask)
+
+extern void esp_vApplicationIdleHook( void );
+extern void esp_vApplicationTickHook( void );
 
 #ifdef __cplusplus
 }

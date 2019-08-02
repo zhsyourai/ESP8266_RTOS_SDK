@@ -19,22 +19,22 @@
 #include "netif/etharp.h"
 #include "esp_libc.h"
 #include "esp_wifi.h"
+#include "esp_aio.h"
 #include "tcpip_adapter.h"
-#include "esp_socket.h"
 #include "freertos/semphr.h"
 #include "lwip/tcpip.h"
 #include "stdlib.h"
 
 #include "esp8266/eagle_soc.h"
 
-int8_t ieee80211_output_pbuf(uint8_t fd, uint8_t* dataptr, uint16_t datalen);
+int ieee80211_output_pbuf(esp_aio_t *aio);
 int8_t wifi_get_netif(uint8_t fd);
 void wifi_station_set_default_hostname(uint8_t* hwaddr);
 
 #define IFNAME0 'e'
 #define IFNAME1 'n'
 
-
+#if ESP_TCP
 typedef struct pbuf_send_list {
     struct pbuf_send_list* next;
     struct pbuf* p;
@@ -44,8 +44,10 @@ typedef struct pbuf_send_list {
 
 static pbuf_send_list_t* pbuf_list_head = NULL;
 static int pbuf_send_list_num = 0;
+#endif
 static int low_level_send_cb(esp_aio_t* aio);
 
+#if ESP_TCP
 static inline bool check_pbuf_to_insert(struct pbuf* p)
 {
     uint8_t* buf = (uint8_t*)p->payload;
@@ -142,7 +144,7 @@ void send_from_list()
             aio.arg = pbuf_list_head->p;
             aio.ret = 0;
 
-            err = esp_aio_sendto(&aio, NULL, 0);
+            err = ieee80211_output_pbuf(aio);
             tmp_pbuf_list1 = pbuf_list_head->next;
 
             if (err == ERR_MEM) {
@@ -172,6 +174,7 @@ void send_from_list()
         }
     }
 }
+#endif
 
 /**
  * In this function, the hardware should be initialized.
@@ -213,6 +216,8 @@ static void low_level_init(struct netif* netif)
 static int low_level_send_cb(esp_aio_t* aio)
 {
     struct pbuf* pbuf = aio->arg;
+
+#if ESP_TCP
     wifi_tx_status_t* status = (wifi_tx_status_t*) & (aio->ret);
 
     if ((TX_STATUS_SUCCESS != status->wifi_tx_result) && check_pbuf_to_insert(pbuf)) {
@@ -235,6 +240,7 @@ static int low_level_send_cb(esp_aio_t* aio)
                                        status->wifi_tx_result, status->wifi_tx_lrc, status->wifi_tx_src, status->wifi_tx_rate));
         insert_to_list(aio->fd, aio->arg);
     }
+#endif
 
     pbuf_free(pbuf);
 
@@ -343,14 +349,16 @@ static int8_t low_level_output(struct netif* netif, struct pbuf* p)
      * we use "SOCK_RAW" to create socket, so all input/output datas include full ethernet
      * header, meaning we should not pass target low-level address here.
      */
-    err = esp_aio_sendto(&aio, NULL, 0);
+    err = ieee80211_output_pbuf(&aio);
 #if ESP_UDP
     udp_sync_set_ret(netif, p, err);
 #endif
 
     if (err != ERR_OK) {
         if (err == ERR_MEM) {
+#if ESP_TCP
             insert_to_list(aio.fd, p);
+#endif
             err = ERR_OK;
         }
 
@@ -395,6 +403,7 @@ void ethernetif_input(struct netif* netif, struct pbuf* p)
 
     if (netif == NULL) {
         LWIP_DEBUGF(NETIF_DEBUG, ("ethernetif_input: netif is NULL\n"));
+        pbuf_free(p);
         goto _exit;
     }
 
@@ -459,7 +468,7 @@ int8_t ethernetif_init(struct netif* netif)
 
 #if LWIP_NETIF_HOSTNAME
 
-    netif->hostname = "lwip";
+    netif->hostname = "LWIP";
 
 #endif /* LWIP_NETIF_HOSTNAME */
 
